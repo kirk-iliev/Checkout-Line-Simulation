@@ -6,91 +6,129 @@
 #include <string>
 #include <fstream>
 
+const int wait_for = 1;
 
+// Running the program will start the simulation, pausing it at each step or unit of time.
+// 
+// The length of time to wait at each step can be changed in the cosntant variable "wait_for" at the top (in milliseconds).
+// 
+// e.g. 1000 milliseconds for one second steps, 500 for half. If running a long sim time, best to keep "wait_for" low
+// so as not to be waiting 30 min to get results
+// 
+// The parameters for the simulation can be changed in the main thread.
+
+// Declaring the Customer object
 class Customer
 {
 public:
-
+    // Constructor
     Customer(int a, int b) {
         arrivalTime = a;
         customerServiceTime = b;
         timeWaited = 0;
     }
 
+    // Values
     int arrivalTime;
     int customerServiceTime;
     int timeWaited;
 
+    // Function to return arrival time
     int getArrivalTime() {
         return arrivalTime;
     }
 
 };
 
+// Function to pause the simulation at each step for a given time in milliseconds
 void simPause(int t) {
     std::cout << "Simulation step: " << t << std::endl;
     using namespace std::this_thread;
     using namespace std::chrono;
-    sleep_for(milliseconds(1));
+    sleep_for(milliseconds(wait_for));
 }
 
+// Function to determine if Customer arrived
 bool customerArrived(double prob) {
     double rv = rand() / (double(RAND_MAX) + 1);
     return (rv < prob);
 }
 
+// Function used to calculate total sum
 void increment(int& x, int a) {
     x = x + a;
 }
 
+// Function to get the time a customer waited
 int getWaitTime(Customer A, int c) {
     int waitTime = c - A.arrivalTime;
     return waitTime;
 }
 
+// Main
 int main() {
 
+    // Declaring the queue of Customer objects
     std::queue<Customer> customerQueue;
+
+    // Initialize randomness
     srand(int(time(NULL)));
-    int simTime = 2000;
-    int serviceTime = 15;
-    int maxLineSize = 5;
-    int curCustomerTime = 0;
+    
+    // Simulation parameters
+    const int simTime = 2000;
+    const int serviceTime = 15;
+    const int maxLineSize = 5;
+    const float arrivalRate = 0.1;
+
+
+    // Variables to store Simulation results
     int droppedCustomers = 0;
     int totalServed = 0;
     int totalLineSize = 0;
     int totalWaitTime = 0;
-    
+
 
     //Simulation loop
     for (int i = 0; i < simTime; i++) {
+        // Calling pause function with each pass
         simPause(i);
+        // Adding to sum of totalLineSize to get average later
         increment(totalLineSize, (int)customerQueue.size());
 
-        if (customerArrived(0.1) && customerQueue.size() < maxLineSize) {
+        // Check if customer arrived
+        if (customerArrived(arrivalRate) && customerQueue.size() < maxLineSize) {
             std::cout << "Customer arrived." << std::endl;
+            // Create new customer object and store into queue
             Customer* C = new Customer(i, serviceTime);
             customerQueue.push(*C);
+
             std::cout << "New customer has arrived at time: " << C->getArrivalTime() << std::endl;
             std::cout << "Queue size now at: " << customerQueue.size() << std::endl;
+            // Increment the total served
             totalServed++;
 
         }
-        else if (customerArrived(0.1) && customerQueue.size() == maxLineSize) {
+        // Check if line is full when customer arrives
+        else if (customerArrived(arrivalRate) && customerQueue.size() == maxLineSize) {
             std::cout << "Line at max size, customer dropped." << std::endl;
+            // Increment dropped customer count
             droppedCustomers++;
         }
 
+        // Decrement the front of line customer's time spent at front with each pass
         if (!customerQueue.empty()) {
             customerQueue.front().customerServiceTime--;
         }
+        // Once front customer's service time is up, pop them out of queue
         if (!customerQueue.empty() && customerQueue.front().customerServiceTime == 0) {
 
             customerQueue.pop();
             std::cout << "Customer at front of line is finished." << std::endl << "New queue size is: " << customerQueue.size() << std::endl;
+            // If customer existed behind the front customer, report how long they waited
             if (!customerQueue.empty()) {
                 customerQueue.front().timeWaited = getWaitTime(customerQueue.front(), i);
                 std::cout << "Previous customer waited for: " << customerQueue.front().timeWaited << std::endl;
+                // Use "increment" function to add to the total wait time to get average later
                 increment(totalWaitTime, customerQueue.front().timeWaited);
             }
 
@@ -98,6 +136,7 @@ int main() {
 
     }
 
+    // Calculate averages and print all results.
     double averageLineSize = (double)totalLineSize / simTime;
     double averageTimeWaited = (double)totalWaitTime / totalServed;
     std::cout << "Total customers served: " << totalServed << std::endl << "Total customers dropped: " << droppedCustomers << std::endl;
